@@ -6099,8 +6099,9 @@ describe('Chat Server result delivery and refresh', () => {
   describe('borrowing someone else\'s companion (§14)', () => {
     const peer = '30000000-0000-4000-8000-000000000002';
     const sourceId = execution.source_message_id;
+    let mentions = [botId];
     const request = { id: sourceId, seq: '1', authorId: peer, author: { kind: 'human', name: 'Peer' }, origin: 'user', deleted: false,
-      threadRootId: null, createdAt: '2026-10-03T00:00:00Z',
+      threadRootId: null, createdAt: '2026-10-03T00:00:00Z', get mentions() { return mentions; },
       content: [{ type: 'card', namespace: 'cindy.companion-borrow', schemaRevision: 1, fallback: 'Bot, may I borrow you?', data: { type: 'request' } }] };
     const link = 'https://link.example.com/api/device-link/provider-share/join#token';
     function serve(mode: 'owner' | 'chat' | 'tools', guestAccess: 'chat' | 'tools' = 'tools') {
@@ -6140,6 +6141,17 @@ describe('Chat Server result delivery and refresh', () => {
       expect(deps.companionBorrowLink).toHaveBeenCalledTimes(created ? 1 : 0);
       expect(deps.ensureLane).not.toHaveBeenCalled();
       expect(deps.dispatch).not.toHaveBeenCalled();
+    });
+
+    // A hand-made card naming several companions is not a borrow request: each would mint its own link.
+    it('treats a borrow card that names other companions too as an ordinary request', async () => {
+      deps.companionBorrowLink = vi.fn();
+      mentions = [botId, '20000000-0000-4000-8000-000000000002'];
+      serve('tools');
+      await claim();
+      mentions = [botId];
+      expect(deps.companionBorrowLink).not.toHaveBeenCalled();
+      expect(deps.ensureLane).toHaveBeenCalledOnce();
     });
 
     it('shows the link only to the member who asked', async () => {

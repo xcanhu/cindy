@@ -7,8 +7,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createIpcError } from '../../../shared/ipc-errors.js';
 import { createCompanionBorrowLink } from '../companionBorrow.js';
+import type { BotModelRoute } from '../../../shared/botModelChain.js';
 
-const route = (providerId: string, agentDeviceId?: string) => ({ harness: 'claude' as const, providerId, model: 'm', ...(agentDeviceId ? { agentDeviceId } : {}) });
+const route = (providerId: string, agentDeviceId?: string): BotModelRoute => ({ harness: 'claude', providerId, model: 'm', effort: '', fastMode: false, ...(agentDeviceId ? { agentDeviceId } : {}) });
 
 describe('createCompanionBorrowLink', () => {
   it('lends the first provider on this computer, skipping routes that run elsewhere', async () => {
@@ -26,6 +27,13 @@ describe('createCompanionBorrowLink', () => {
     const createLink = vi.fn(async () => { throw error; });
     const borrow = createCompanionBorrowLink({ readChain: async () => [...chain], createLink });
     expect(await borrow({ botId: 'b', assertCurrent: () => {} })).toEqual({ ok: false, reason });
+  });
+
+  it('reports a model chain it cannot read as a temporary failure', async () => {
+    const createLink = vi.fn();
+    const borrow = createCompanionBorrowLink({ readChain: async () => { throw new Error('db busy'); }, createLink });
+    expect(await borrow({ botId: 'b', assertCurrent: () => {} })).toEqual({ ok: false, reason: 'unavailable' });
+    expect(createLink).not.toHaveBeenCalled();
   });
 
   it('stops instead of answering when the turn went stale while the link was made', async () => {

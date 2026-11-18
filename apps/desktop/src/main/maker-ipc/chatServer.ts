@@ -3390,7 +3390,9 @@ function createChatServer(local: BotGroupChatService, deps: BotGroupChatServiceD
   async function isBorrowRequest(execution: Execution, sourceRead: Promise<Message | undefined> | undefined): Promise<boolean> {
     if (!sourceRead || execution.plan_id || execution.mask_owner_id || execution.mask_kind) return false;
     const source = await sourceRead.catch(() => undefined);
+    // One request names exactly this companion: a card naming several would make each of them answer.
     return !!source && !!execution.requester_id && !source.threadRootId && source.authorId === execution.requester_id
+      && !source.mentionAudience && source.mentions?.length === 1 && source.mentions[0] === execution.bot_id
       && isBotGroupCompanionBorrowRequest(source);
   }
   /**

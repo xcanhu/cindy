@@ -22,7 +22,10 @@ const errorCode = (error: unknown) => error && typeof error === 'object' && 'cod
 
 export function createCompanionBorrowLink(deps: CompanionBorrowLinkDeps) {
   return async ({ botId, assertCurrent }: { botId: string; assertCurrent: () => void }): Promise<CompanionBorrowLinkResult> => {
-    const chain = await deps.readChain(botId).catch(() => []);
+    let chain: BotModelRoute[];
+    // A chain that cannot be read now is a temporary failure, not a provider that cannot be lent.
+    try { chain = await deps.readChain(botId); }
+    catch { assertCurrent(); return { ok: false, reason: 'unavailable' }; }
     assertCurrent();
     // Only a provider on this computer can be shared from here: a route that already runs on another
     // computer (or on someone else's share) is not this owner's to lend from this machine.

@@ -9,12 +9,12 @@
 
 - 请求：真人本人发出，`data: { type: "request" }`，`mentions` 只有被借的伙伴 actor；`fallback` 是请求方语言的一句话，
   旧客户端与旧版伙伴主人电脑按普通点名处理（只聊天回复）。识别要求作者是 `human`、`origin` 为空或 `user`、整条消息只有这一张卡、
-  不在话题里，且作者就是执行的 `requester_id`。
+  不在话题里，作者就是执行的 `requester_id`，且 `mentions` 恰好只有这位伙伴、没有 `mentionAudience`。
 - 回复：伙伴身份发出，`data` 为 `{ type: "offer", requesterId, link, expiresAt }`（`link` 必须是 `https://…/provider-share/join#…`，
   `expiresAt` 可解析）或 `{ type: "unavailable", requesterId, reason }`，`reason ∈ own | not-allowed | not-shareable | unavailable`，
   未知原因按 `unavailable` 读。真人发的同形卡片不算回复。执行完成体带 `continueDiscussion: false`。
 - 读取：`BotGroupMessageView` 追加可选 `companionBorrow: { forMe, link, expiresAt, reason }`；`link` 只投影给 `requesterId` 本人，
-  其他人为 `null`。正文仍是卡片 fallback。旧渲染层与手机忽略新字段，只见 fallback。
+  其他人为 `null`。这只是投影：卡片原文对全群可读，链接的保护来自一次性、5 分钟过期与主人审批，不来自隐藏。正文仍是卡片 fallback。旧渲染层与手机忽略新字段，只见 fallback。
 - IPC：新增 `maker:chat-server:borrowCompanion`（`{ groupId, actorId }` → `{ ok, messageId } | { ok: false, errorCode }`），
   仅本机受信窗口；不进设备互联 allowlist（供应商分享只能在电脑上申请）。新错误码 `BORROW_NOT_ALLOWED`（伙伴没开工具授权）。
 - 链接本身沿用供应商分享的一次性邀请与申请／审批合同（`docs/provider-sharing-contract.md`），不新增字段。

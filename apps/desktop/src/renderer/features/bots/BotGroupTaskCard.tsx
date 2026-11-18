@@ -7,6 +7,7 @@
  * title and state — because that task runs on the companion's home computer.
  */
 import { ArrowUpRight, ListTodo } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -95,12 +96,20 @@ export function BotGroupLiveTaskCard({ task }: { task: NonNullable<BotGroupMessa
  * provider-share application (the owner still confirms the pairing code). The link expires within
  * minutes, after which the action is gone and you ask again from the member list.
  */
-export function BotGroupCompanionBorrowAction({ borrow, now = Date.now() }: {
-  borrow: NonNullable<BotGroupMessageView['companionBorrow']>; now?: number;
-}) {
+export function BotGroupCompanionBorrowAction({ borrow }: { borrow: NonNullable<BotGroupMessageView['companionBorrow']> }) {
   const { t } = useTranslation();
+  const expiresAt = borrow.expiresAt ? Date.parse(borrow.expiresAt) : NaN;
+  const [expired, setExpired] = useState(() => Number.isFinite(expiresAt) && expiresAt <= Date.now());
+  // The card can stay on screen past the link's life: flip to the expired note at that moment.
+  useEffect(() => {
+    if (!Number.isFinite(expiresAt)) return;
+    const left = expiresAt - Date.now();
+    if (left <= 0) { setExpired(true); return; }
+    setExpired(false);
+    const timer = setTimeout(() => setExpired(true), Math.min(left, 2 ** 31 - 1));
+    return () => clearTimeout(timer);
+  }, [expiresAt]);
   if (!borrow.forMe || !borrow.link) return null;
-  const expired = !!borrow.expiresAt && Date.parse(borrow.expiresAt) <= now;
   if (expired) return <span data-testid="bot-group-companion-borrow-expired" className="text-12 leading-5 text-[var(--text-tertiary)]">{t('bots.groupChat.borrow.expired')}</span>;
   const link = borrow.link;
   return (
