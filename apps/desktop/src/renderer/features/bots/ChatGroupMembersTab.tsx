@@ -24,6 +24,8 @@ export interface MemberActions {
   role(member: BotGroupMemberView): void;
   transfer(member: BotGroupMemberView): void;
   remove(member: BotGroupMemberView): void;
+  /** 借来单聊 (bot-group-chat.md §14): ask someone else's companion for a link to use it 1:1. */
+  borrow?(member: BotGroupMemberView): void;
 }
 
 export function ChatGroupMembersTab({ group, owner, manager, busy, actions }: {
@@ -62,7 +64,10 @@ function MemberRow({ member, group, owner, manager, busy, actions }: {
   const manageable = manager && !assistant && !member.isSelf && !!member.actorId && (owner || member.role !== 'owner');
   // Ownership goes to a person, including yourself when your teammate holds it.
   const transferable = owner && !!member.actorId && member.actorKind === 'human' && member.role !== 'owner';
-  const menuable = !group.dissolvedAt && (manageable || transferable || (mine && !!member.actorId));
+  // Someone else's companion whose owner lets you use its tools here can be borrowed for a 1:1 task.
+  const borrowable = !!actions.borrow && bot && !assistant && member.isOwned !== true && !member.isSelf && !paused
+    && member.guestAccess === 'tools' && !!member.actorId && !group.archived;
+  const menuable = !group.dissolvedAt && (manageable || transferable || (mine && !!member.actorId) || borrowable);
   const hint = assistant ? t(key('assistantHint')) : bot
     ? `${t(key('teammateTag'))} · ${t(paused ? key('paused') : ACCESS_LABELS[member.guestAccess ?? 'chat'])}`
     : t(key(member.role ?? 'member'));
@@ -79,6 +84,7 @@ function MemberRow({ member, group, owner, manager, busy, actions }: {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-48">
           {mine && <DropdownMenuItem onSelect={() => actions.access(member)}>{t(key('accessMenu'))}</DropdownMenuItem>}
+          {borrowable && <DropdownMenuItem onSelect={() => actions.borrow?.(member)}>{t('bots.groupChat.borrow.menu')}</DropdownMenuItem>}
           {manageable && <DropdownMenuItem onSelect={() => actions.role(member)}>{t(key(member.role === 'admin' ? 'removeAdmin' : 'makeAdmin'))}</DropdownMenuItem>}
           {transferable && <DropdownMenuItem onSelect={() => actions.transfer(member)}>{t(key('transfer'))}</DropdownMenuItem>}
           {(manageable || (mine && !!member.actorId)) && <>

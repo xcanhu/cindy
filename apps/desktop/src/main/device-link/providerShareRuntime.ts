@@ -1397,6 +1397,14 @@ export function registerProviderShareIpc(): void {
   });
 }
 
+/**
+ * 借来单聊(bot-group-chat.md §14)：伙伴的主力电脑替群里获准使用这位伙伴工具的成员，为它所用的供应商
+ * 生成一条普通分享链接。与主人自己点「分享」完全相同：一次性、几分钟过期，申请仍要主人确认配对码。
+ */
+export async function createCompanionBorrowShareLink(providerId: string, assertCurrent: () => void): Promise<ProviderShareLinkCreated> {
+  return await execute({ action: 'create-link', providerId }, assertCurrent) as ProviderShareLinkCreated;
+}
+
 /** 深链 `cindy://provider-share/join?...` → 让 Renderer 打开申请弹窗。 */
 export function openProviderShareJoin(link: string): void {
   log.info('share join activation');

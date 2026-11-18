@@ -11225,6 +11225,21 @@
       "exchangeCountShort_many": "{{count}} mensagens"
     },
     "groupChat": {
+      "borrow": {
+        "menu": "Pegar este colega emprestado",
+        "request": "{{name}}, posso pegar você emprestado? Você trabalharia no meu computador, com a cota do seu dono.",
+        "requested": "Pedido de empréstimo enviado a {{name}}. A resposta aparecerá no grupo.",
+        "offer": "Você pode pegá-lo emprestado. Clique em \"Solicitar\"; quando o dono de {{name}} confirmar o código de pareamento, o modelo que ele usa aparecerá na sua lista de modelos: escolha-o em uma nova tarefa para trabalhar no seu computador, com a cota do dono.",
+        "apply": "Solicitar",
+        "expired": "Este link de empréstimo expirou. Você pode pedir de novo pela lista de membros.",
+        "notAllowed": "O dono deste colega não permitiu que você use as ferramentas dele neste grupo.",
+        "unavailable": {
+          "own": "{{name}} é seu próprio colega. Converse com ele diretamente.",
+          "not-allowed": "O dono de {{name}} não ativou \"Ferramentas e informações\" neste grupo, então ainda não dá para pegar emprestado.",
+          "not-shareable": "O modelo que {{name}} usa não pode ser emprestado: o dono precisa antes permitir chamadas remotas para este provedor em \"Acesso remoto e compartilhamento\".",
+          "unavailable": "O dono de {{name}} não conseguiu criar um link de empréstimo agora. Tente novamente mais tarde."
+        }
+      },
       "mask": {
         "toolAccess": "Acesso a ferramentas",
         "catchup": {

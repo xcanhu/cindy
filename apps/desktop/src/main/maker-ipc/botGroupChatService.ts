@@ -232,6 +232,12 @@ export interface BotGroupChatServiceDeps {
   onAccountPreferenceChanged?: (key: string) => void;
   /** Cloud companions (cloud-companions.md); absent keeps the Chat Server per-computer only. */
   companionCloud?: import('../companion-cloud/runtime.js').CompanionCloudHost;
+  /**
+   * 借来单聊 (bot-group-chat.md §14): a provider-share link for the provider this companion runs on,
+   * created like the owner's own 分享 (the owner still approves whoever applies with it).
+   */
+  companionBorrowLink?: (input: { botId: string; assertCurrent: () => void }) => Promise<
+    { ok: true; link: string; expiresAt: string } | { ok: false; reason: 'not-shareable' | 'unavailable' }>;
   now?: () => number;
   createId?: () => string;
   memberTurnTimeoutMs?: number;

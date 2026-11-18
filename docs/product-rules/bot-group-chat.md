@@ -1546,3 +1546,34 @@ Desktop 用 `projectGrouping.ts`，Mobile 用 `maker-shared/sessionList.ts`，�
 归档／恢复／删除与 Light/Dark 列表；含错误消息的旧任务仍能读取。验收数据通过伙伴生命周期清理。
 这不是正式账号群消息执行或真机跨设备验证；服务器群执行、手机远程打开与运行中真实群轮次仍待连线验收。
 按物理工作目录检索的 Agent 工具继续使用执行位置，不把它改写成显示项目；显式项目搜索才用显示归属。
+
+## 14. 借用别人的伙伴（2026-11-18）
+
+用户原话：「别人的伙伴需要支持单聊，因为单聊时有 agent 功能」「是让别人伙伴可以在自己电脑上执行 agent，但是还是用的伙伴的额度」「不用改服务端」。
+群里别人的伙伴只在主人电脑上替主人干活（§7.5、§10）；要在自己电脑上让它干活，就借用它的模型。第一版只改客户端，复用群授权判断谁能借、
+复用[供应商分享](provider-sharing.md)完成借出、确认与计量。
+
+- **谁能借**：主人在本群给这位伙伴开了「可以用工具和资料」（`guestAccess: 'tools'`）的成员。群设置「成员」里，这类别人的伙伴行尾出现「⋯ → 借用这位伙伴」；
+  自己的伙伴、群里的 Cindy、暂停的伙伴、只聊天或仅主人可用的伙伴都没有这一项。点了先重读成员核对授权，再以本人身份往主群发一条点名这位伙伴的
+  借用请求（一张 `cindy.companion-borrow` 卡，`type: 'request'`，正文是给旧客户端看的一句话），提示「回复会出现在群里」。
+- **主人电脑怎么答**：伙伴的主力电脑照常领取这次执行，认出来源是请求人本人发的借用卡（不在话题里、不是分工或 AI 代答，且只点名了这一位伙伴；同时点名多位的卡按普通请求只聊天）后**不运行伙伴**：
+  执行的 `access_mode` 必须是 `tools`，并按 `validateExecutionAuthority` 当场重读成员核对授权版本（领取后撤回的不算）；通过后取伙伴生效模型链里第一条
+  在这台电脑上的供应商（`agentDeviceId` 为空），用主人自己「分享」的同一条路径生成一次性分享链接（`createCompanionBorrowShareLink`）。
+  回复是同一种卡：`type: 'offer'` 带链接与过期时间，或 `type: 'unavailable'` 带原因：`own`（主人自己）、`not-allowed`（没有工具授权）、
+  `not-shareable`（伙伴用的供应商不在这台电脑，或主人没开远程控制／远程调用）、`unavailable`（分享服务暂时失败）。这一轮按普通完成结算，
+  `continueDiscussion: false`，不叫醒其他伙伴。
+- **请求人怎么用**：群页只把链接投影给提问的人（`companionBorrow.forMe`），其他成员只看到卡上的文字。卡下「申请使用」打开现有的分享申请弹窗
+  （`requestProviderShareJoin`），主人照常在审批窗口核对配对码同意；之后这个供应商出现在请求人的模型列表里，新建任务选它，任务和文件在请求人自己的
+  电脑上，模型与额度在主人那边，主人在「远程与分享」里看用量、暂停或删除（provider-sharing.md §1、§7）。链接 5 分钟过期，过期后按钮换成提示，
+  从成员列表重新借用。
+- **边界**：不放宽任何权限。群授权只决定「能不能拿到链接」，真正的使用权仍由主人逐人确认的供应商分享决定；分享前三级开关、额度、运行数上限、
+  撤权全部沿用供应商分享。「只给提问的人」只是界面投影，不是保密：卡片原文存在群消息里，任何成员的客户端都能读到链接并抢先申请。兜底是链接一次性、5 分钟过期，申请仍要主人核对申请人身份与配对码；只把链接交给请求人需要服务端提供按人投递的通道（2026-11-18 codex review 指出，第一版不改服务端，暂按此保留）。不带伙伴的人设、技能、记忆
+  或私人资料，借到的是它用的模型。没有新服务端接口或字段：请求与回复都是现有消息合同里的卡片；旧客户端看到卡片的 fallback 文字，旧版主人电脑
+  会把请求当普通点名只聊天回复。手机本次不提供入口（供应商分享只能在电脑上申请）。
+- **还没做**：链接只投递给请求人（需服务端按人投递）；群授权直接放行、免主人确认（需要服务端认可群授权的跨账号链路，用户 2026-11-18 决定先不做）；一键用借来的模型开任务、带上伙伴的
+  名字与人设；手机入口。
+
+实现：`chatServer.ts`（`borrowCompanion`、`isBorrowRequest`、`runBorrowExecution`、群页投影 `companionBorrow`）、`companionBorrow.ts`、
+`providerShareRuntime.ts`（`createCompanionBorrowShareLink`）、`maker-shared/botGroupChat.ts`（卡片读写）、`ChatGroupMembersTab.tsx`、
+`ChatGroupSettings.tsx`、`BotGroupTaskCard.tsx`（`BotGroupCompanionBorrowAction`）。回归见 `chatServer.test.ts`「borrowing someone else's companion」、
+`companionBorrow.test.ts` 与 `ChatGroupSettings.test.tsx`。

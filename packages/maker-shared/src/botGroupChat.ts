@@ -245,6 +245,11 @@ export interface BotGroupMessageView {
    * runs on this computer (otherwise it opens through the same-account remote path).
    */
   liveTask?: BotGroupLiveTaskView & { openable?: boolean; here?: boolean };
+  /**
+   * 借来单聊 (§14): a companion's answer to a borrow request. `forMe`: this account asked, so only it
+   * gets the 申请使用 action; the link is shown to nobody else.
+   */
+  companionBorrow?: { forMe: boolean; link: string | null; expiresAt: string | null; reason: BotGroupCompanionBorrowReason | null };
   reactions?: Array<{ emoji: string; count: number; me: boolean }>;
   id: string;
   sequence: number;
@@ -362,6 +367,71 @@ export function readBotGroupThreadShareCard(message: {
   if (typeof messageId !== 'string' || typeof threadRootId !== 'string' || !UUID.test(messageId) || !UUID.test(threadRootId)
     || messageId === threadRootId) return null;
   return { messageId, threadRootId };
+}
+
+/**
+ * 借来单聊 (bot-group-chat.md §14): a member asks to use someone else's companion in a 1:1 task on
+ * their own computer. The request is a person's message naming the companion and carrying one
+ * `cindy.companion-borrow` card of type `request`; the companion's home computer answers with one card
+ * of type `offer` (a provider-share link for the companion's provider, still approved by the owner) or
+ * `unavailable`. The card is only a locator: the owner's existing approval decides who may use it.
+ */
+export const BOT_GROUP_COMPANION_BORROW_NAMESPACE = 'cindy.companion-borrow';
+const COMPANION_BORROW_REVISION = 1;
+export const BOT_GROUP_COMPANION_BORROW_REASONS = ['own', 'not-allowed', 'not-shareable', 'unavailable'] as const;
+export type BotGroupCompanionBorrowReason = typeof BOT_GROUP_COMPANION_BORROW_REASONS[number];
+export interface BotGroupCompanionBorrowCard {
+  requesterId: string;
+  /** Present on an offer: an official provider-share link (`https://…/provider-share/join#…`). */
+  link: string | null;
+  expiresAt: string | null;
+  reason: BotGroupCompanionBorrowReason | null;
+}
+type CardMessage = {
+  deleted?: unknown; author?: { kind?: unknown }; origin?: unknown;
+  content: readonly { type?: unknown; namespace?: unknown; schemaRevision?: unknown; data?: unknown }[];
+};
+function companionBorrowData(message: CardMessage): Record<string, unknown> | null {
+  if (message.deleted === true || message.content.length !== 1) return null;
+  const card = message.content[0];
+  if (card?.type !== 'card' || card.namespace !== BOT_GROUP_COMPANION_BORROW_NAMESPACE
+    || card.schemaRevision !== COMPANION_BORROW_REVISION) return null;
+  return card.data && typeof card.data === 'object' && !Array.isArray(card.data) ? card.data as Record<string, unknown> : null;
+}
+export function buildBotGroupCompanionBorrowRequest(fallback: string) {
+  return { type: 'card' as const, namespace: BOT_GROUP_COMPANION_BORROW_NAMESPACE, schemaRevision: COMPANION_BORROW_REVISION,
+    fallback, data: { type: 'request' } };
+}
+/** Only a person's own message asks; a look-alike card from a companion never does. */
+export function isBotGroupCompanionBorrowRequest(message: CardMessage): boolean {
+  if (message.author?.kind !== 'human' || (message.origin !== undefined && message.origin !== 'user')) return false;
+  return companionBorrowData(message)?.type === 'request';
+}
+const OFFER_LINK = /^https:\/\/[^\s#]+\/provider-share\/join#[^\s]+$/;
+export function buildBotGroupCompanionBorrowReply(input: {
+  requesterId: string; fallback: string;
+} & ({ link: string; expiresAt: string } | { reason: BotGroupCompanionBorrowReason })) {
+  const data = 'link' in input
+    ? { type: 'offer', requesterId: input.requesterId, link: input.link, expiresAt: input.expiresAt }
+    : { type: 'unavailable', requesterId: input.requesterId, reason: input.reason };
+  return { type: 'card' as const, namespace: BOT_GROUP_COMPANION_BORROW_NAMESPACE, schemaRevision: COMPANION_BORROW_REVISION,
+    fallback: input.fallback, data };
+}
+/** A companion's answer; anything malformed, or posted by a person, is not one. */
+export function readBotGroupCompanionBorrowReply(message: CardMessage): BotGroupCompanionBorrowCard | null {
+  if (message.author?.kind !== 'bot' || (message.origin !== undefined && message.origin !== 'bot')) return null;
+  const data = companionBorrowData(message);
+  if (!data || typeof data.requesterId !== 'string' || !data.requesterId) return null;
+  if (data.type === 'offer') {
+    if (typeof data.link !== 'string' || data.link.length > 4096 || !OFFER_LINK.test(data.link)
+      || typeof data.expiresAt !== 'string' || !Number.isFinite(Date.parse(data.expiresAt))) return null;
+    return { requesterId: data.requesterId, link: data.link, expiresAt: data.expiresAt, reason: null };
+  }
+  if (data.type === 'unavailable') {
+    const reason = BOT_GROUP_COMPANION_BORROW_REASONS.find(value => value === data.reason) ?? 'unavailable';
+    return { requesterId: data.requesterId, link: null, expiresAt: null, reason };
+  }
+  return null;
 }
 
 export interface BotGroupThreadPreviewReply {
@@ -1093,6 +1163,8 @@ export type ChatGroupAction =
   | { type: 'hide' }
   | { type: 'archive'; archived: boolean; expectedRevision: number };
 export interface ChatServerApi {
+  /** 借来单聊 (§14): ask someone else's companion, by its member actor, for a link to use it 1:1. */
+  borrowCompanion?(input: { groupId: string; actorId: string }): Promise<ChatServerResult<{ messageId: string }>>;
   mask?(input: { groupId: string; action?: ChatMaskAction; operationId?: string }): Promise<ChatServerResult<{ state: ChatMaskState }>>;
   mentions?(input: { groupId: string; before?: string; readIds?: string[]; operationId?: string }): Promise<ChatServerResult<{ mentions: ChatMaskMention[]; hasMore: boolean }>>;
   manage(input: { groupId: string; action: ChatGroupAction }): Promise<ChatServerResult<{ listState?: { conversationId: string; hidden: boolean; revision: number } }>>;

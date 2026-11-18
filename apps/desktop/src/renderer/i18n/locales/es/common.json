@@ -11225,6 +11225,21 @@
       "exchangeCountShort_many": "Mensajes {{count}}"
     },
     "groupChat": {
+      "borrow": {
+        "menu": "Pedir prestado este compañero",
+        "request": "{{name}}, ¿puedo pedirte prestado? Trabajarías en mi ordenador, con la cuota de tu propietario.",
+        "requested": "Has pedido prestado a {{name}}. La respuesta aparecerá en el grupo.",
+        "offer": "Puedes pedirlo prestado. Pulsa «Solicitar»; cuando el propietario de {{name}} confirme el código de emparejamiento, el modelo que usa aparecerá en tu lista de modelos: elígelo en una tarea nueva para trabajar en tu propio ordenador, con la cuota del propietario.",
+        "apply": "Solicitar",
+        "expired": "Este enlace de préstamo ha caducado. Puedes volver a pedirlo desde la lista de miembros.",
+        "notAllowed": "El propietario de este compañero no te ha permitido usar sus herramientas en este grupo.",
+        "unavailable": {
+          "own": "{{name}} es tu propio compañero. Habla con él directamente.",
+          "not-allowed": "El propietario de {{name}} no ha activado «Herramientas e información» en este grupo, así que aún no se puede pedir prestado.",
+          "not-shareable": "El modelo que usa {{name}} no se puede prestar: su propietario debe permitir antes las llamadas remotas para este proveedor en «Remoto y compartido».",
+          "unavailable": "El propietario de {{name}} no ha podido crear un enlace de préstamo ahora. Inténtalo más tarde."
+        }
+      },
       "mask": {
         "toolAccess": "Acceso a herramientas",
         "catchup": {

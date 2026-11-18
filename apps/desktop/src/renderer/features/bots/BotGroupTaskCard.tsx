@@ -7,9 +7,12 @@
  * title and state — because that task runs on the companion's home computer.
  */
 import { ArrowUpRight, ListTodo } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { remoteProjectsStore } from '@/features/device-link/remoteProjectsStore';
+import { requestProviderShareJoin } from '@/features/provider-share/joinIntent';
 import { resolveSessionRoute } from '@/lib/orcaSessionIdentity';
 import type { BotGroupMessageView, BotGroupTaskCardView } from '../../../shared/botGroupChat';
 import { BotTaskCard } from './BotCollaborationCard';
@@ -83,6 +86,35 @@ export function BotGroupLiveTaskCard({ task }: { task: NonNullable<BotGroupMessa
         </button>
       ) : <div className="flex min-w-0 flex-1 items-start gap-2.5 px-3 py-2">{body}</div>}
       {pr && <span className="py-1.5 pr-1.5">{pr}</span>}
+    </div>
+  );
+}
+
+/**
+ * 借来单聊 (bot-group-chat.md §14): the companion's answer to your borrow request. The text above it
+ * already says what happened; for an offer made to you this adds 申请使用, which opens the ordinary
+ * provider-share application (the owner still confirms the pairing code). The link expires within
+ * minutes, after which the action is gone and you ask again from the member list.
+ */
+export function BotGroupCompanionBorrowAction({ borrow }: { borrow: NonNullable<BotGroupMessageView['companionBorrow']> }) {
+  const { t } = useTranslation();
+  const expiresAt = borrow.expiresAt ? Date.parse(borrow.expiresAt) : NaN;
+  const [expired, setExpired] = useState(() => Number.isFinite(expiresAt) && expiresAt <= Date.now());
+  // The card can stay on screen past the link's life: flip to the expired note at that moment.
+  useEffect(() => {
+    if (!Number.isFinite(expiresAt)) return;
+    const left = expiresAt - Date.now();
+    if (left <= 0) { setExpired(true); return; }
+    setExpired(false);
+    const timer = setTimeout(() => setExpired(true), Math.min(left, 2 ** 31 - 1));
+    return () => clearTimeout(timer);
+  }, [expiresAt]);
+  if (!borrow.forMe || !borrow.link) return null;
+  if (expired) return <span data-testid="bot-group-companion-borrow-expired" className="text-12 leading-5 text-[var(--text-tertiary)]">{t('bots.groupChat.borrow.expired')}</span>;
+  const link = borrow.link;
+  return (
+    <div data-testid="bot-group-companion-borrow">
+      <Button size="sm" variant="secondary" onClick={() => requestProviderShareJoin(link)}>{t('bots.groupChat.borrow.apply')}</Button>
     </div>
   );
 }

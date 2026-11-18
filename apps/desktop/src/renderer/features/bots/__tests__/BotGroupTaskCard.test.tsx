@@ -21,7 +21,11 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => nav.navigate }));
 vi.mock('@/features/device-link/remoteProjectsStore', () => ({ remoteProjectsStore: { pinSessionOrigin: nav.pin } }));
 vi.mock('@/lib/orcaSessionIdentity', () => ({ resolveSessionRoute: nav.route }));
 
-import { BotGroupLiveTaskCard, BotGroupTaskCard } from '../BotGroupTaskCard';
+const join = vi.hoisted(() => vi.fn());
+vi.mock('@/features/provider-share/joinIntent', () => ({ requestProviderShareJoin: join }));
+
+import { act } from '@testing-library/react';
+import { BotGroupCompanionBorrowAction, BotGroupLiveTaskCard, BotGroupTaskCard } from '../BotGroupTaskCard';
 
 const task = (state: BotGroupTaskCardView['state'], summary?: string): BotGroupTaskCardView => ({
   meta: { v: 1, role: 'delegation-request', delegationId: 'task-1', fromBotId: 'bot-a', fromBotName: 'LiZi', toBotId: null,
@@ -108,5 +112,28 @@ describe('BotGroupLiveTaskCard', () => {
   it('shows where the task stopped after its state', () => {
     render(<BotGroupLiveTaskCard task={{ ...live, state: 'idle', summary: 'Preflight failed' }} />);
     expect(screen.getByTitle('bots.groupChat.task.askedBy · bots.groupChat.task.live.idle · Preflight failed')).toBeTruthy();
+  });
+});
+
+// 测试价值 (bot-group-chat.md §14 借来单聊)
+// - 生产入口与可观察结果：「申请使用」只给提问的人，点了打开分享申请；链接到期时即使没有别的刷新也换成过期提示。
+// - 依据：codex review P3（卡片一直挂着时按钮在过期后仍可点）。最小失败输入：渲染后过 5 分钟不触发其他渲染。tier：unit（jsdom）。
+describe('BotGroupCompanionBorrowAction', () => {
+  const link = 'https://x/provider-share/join#t';
+  it('opens the application for the requester and turns into the expired note at the expiry time', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-03T00:00:00Z'));
+    try {
+      render(<BotGroupCompanionBorrowAction borrow={{ forMe: true, link, expiresAt: '2026-10-03T00:05:00Z', reason: null }} />);
+      fireEvent.click(screen.getByRole('button', { name: 'bots.groupChat.borrow.apply' }));
+      expect(join).toHaveBeenCalledWith(link);
+      act(() => { vi.advanceTimersByTime(5 * 60_000); });
+      expect(screen.queryByRole('button')).toBeNull();
+      expect(screen.getByTestId('bot-group-companion-borrow-expired')).toBeTruthy();
+    } finally { vi.useRealTimers(); }
+  });
+  it('gives other members nothing to press', () => {
+    const { container } = render(<BotGroupCompanionBorrowAction borrow={{ forMe: false, link: null, expiresAt: '2099-01-01T00:00:00Z', reason: null }} />);
+    expect(container.textContent).toBe('');
   });
 });

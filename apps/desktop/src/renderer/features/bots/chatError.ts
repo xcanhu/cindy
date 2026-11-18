@@ -6,6 +6,7 @@ export function chatErrorKey(code: string) {
   if (code === 'ALL_BOTS_MENTION_DISABLED') return 'bots.groupChat.errors.allBotsMentionDisabled';
   if (code === 'MENTION_UNAVAILABLE') return 'bots.groupChat.errors.mentionUnavailable';
   if (code === 'SHARE_UNAVAILABLE') return key('thread.shareUnavailable');
+  if (code === 'BORROW_NOT_ALLOWED') return 'bots.groupChat.borrow.notAllowed';
   if (code === 'LIFECYCLE_UNAVAILABLE') return 'bots.groupChat.lifecycle.unavailable';
   if (['GROUP_DISSOLVED', 'CONVERSATION_DISSOLVED'].includes(code)) return 'bots.groupChat.lifecycle.dissolved';
   if (code === 'LAST_OWNER') return key('settings.lastOwner');

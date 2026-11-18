@@ -476,6 +476,9 @@ import { readGeneratedImageFile, MAX_GENERATED_IMAGE_BYTES } from '../cindy-medi
 import { createGeneratedImageDelivery } from '../cindy-media/generatedImageDelivery.js';
 import { authorizeSharedTaskHistory, liveSharedTaskTarget } from '../remote-agent/controller/providerShareTaskLocation.js';
 import { resolveRemoteAgentTarget } from '../device-link/providerShareGuest.js';
+import { createCompanionBorrowShareLink } from '../device-link/providerShareRuntime.js';
+import { createCompanionBorrowLink } from './companionBorrow.js';
+import { readBotSettingsProfile } from '../localDb/ipc/bots.js';
 import { setGeneratedImageRecovery } from '../cindy-media/generatedImageRecovery.js';
 import {
   getCurrentDbClientSnapshot,
@@ -13676,6 +13679,10 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
       // Phones read groups as remote resources; any change re-reads the row and the chat.
       broadcastBotGroupRemoteResourceChanged(payload.groupId);
     },
+    companionBorrowLink: createCompanionBorrowLink({
+      readChain: async (botId) => readEffectiveBotModelChain((await readBotSettingsProfile(botId)).capabilities as unknown as Record<string, unknown>),
+      createLink: createCompanionBorrowShareLink,
+    }),
     companionCloud: createCompanionCloudHost({
       log,
       ensureCanonicalSession: async (botId) => {
@@ -13860,6 +13867,11 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
     assertTrustedAppRendererEvent(event);
     const chat = botGroupChatServiceHolder?.chatServer;
     return chat ? chat.shareToMain(input) : { ok: false, errorCode: 'HOST_NOT_READY' };
+  });
+  ipcMain.handle(MAKER_INVOKE.CHAT_SERVER_BORROWCOMPANION, async (event, input) => {
+    assertTrustedAppRendererEvent(event);
+    const chat = botGroupChatServiceHolder?.chatServer;
+    return chat?.borrowCompanion ? chat.borrowCompanion(input) : { ok: false, errorCode: 'HOST_NOT_READY' };
   });
   ipcMain.handle(MAKER_INVOKE.CHAT_SERVER_REACT, async (event, input) => {
     assertTrustedAppRendererEvent(event);
