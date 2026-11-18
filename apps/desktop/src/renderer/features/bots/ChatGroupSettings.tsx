@@ -261,7 +261,7 @@ export function ChatGroupSettings({ group }: { group: BotGroupSummary }) {
     busyRef.current = true; setBusy(true); setError('');
     const owner = getDataOwnerGeneration();
     try {
-      const result = await api().borrowCompanion({ groupId: group.id, actorId: member.actorId });
+      const result = await api().borrowCompanion?.({ groupId: group.id, actorId: member.actorId }) ?? { ok: false as const, errorCode: 'HOST_NOT_READY' };
       if (!mounted.current || !isDataOwnerGenerationCurrent(owner)) return;
       if (!result.ok) { setError(t(chatErrorKey(result.errorCode))); return; }
       toast.info(t('bots.groupChat.borrow.requested', { name: botGroupMemberDisplayName(member) }));
