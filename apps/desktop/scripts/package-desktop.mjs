@@ -35,7 +35,8 @@
 //                                   该环境的机器打版本无关包时用它
 //
 // 产物: release/artifacts/<region>/<version|unversioned>/<platform-arch>/
-//   cindy-<version|unversioned>-Setup.exe / -<arch>.dmg /
+//   heyme-<version|unversioned>-Setup.exe(仅 Windows 安装包改名)/
+//   cindy-<version|unversioned>-<arch>.dmg /
 //              -<amd64|arm64>.deb                        安装包
 //   cindy-<version>-hotfix.zip                           热更包(仅有版本时)
 //   build-info.json                                      发布侧唯一输入(含 mcpAppsManual:
@@ -81,6 +82,7 @@ import {
   resolvePackageVersion,
   artifactRelDir,
   artifactBaseName,
+  windowsInstallerFileName,
   buildBuildInfo,
   debianArch,
   pageManualBuildInfo,
@@ -285,7 +287,7 @@ function findSetupExe(makeBaseDir) {
   return walk(makeBaseDir);
 }
 
-async function finishWindows({ artifactDir, baseName, appName, versionless, allowUnsigned, noSign }) {
+async function finishWindows({ artifactDir, baseName, appName, version, versionless, allowUnsigned, noSign }) {
   const makeBaseDir = path.join(DESKTOP_ROOT, 'out', 'make');
   const packagedDir = path.join(DESKTOP_ROOT, 'out', `${appName}-win32-x64`);
   const setupExe = findSetupExe(makeBaseDir);
@@ -356,7 +358,7 @@ async function finishWindows({ artifactDir, baseName, appName, versionless, allo
     console.log('==> CINDY_WIN_SIGN_CMD not set — installer / uninstaller / internal exes are UNSIGNED');
   }
 
-  const installerPath = path.join(artifactDir, `${baseName}-Setup.exe`);
+  const installerPath = path.join(artifactDir, windowsInstallerFileName({ version, versionless }));
   fs.copyFileSync(setupExe, installerPath);
 
   const files = [fileEntry('installer', installerPath)];

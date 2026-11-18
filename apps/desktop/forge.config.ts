@@ -1884,7 +1884,9 @@ if (isWin) {
           // installer-directory.nsh supplies the directory page with a write-access
           // check before installation. The stock page only elevates for all-users.
           allowToChangeInstallationDirectory: false,
-          installerIcon: 'resources/icon.ico',
+          // 安装程序单独用 installer-icon.ico(owner 决定 2026-11-18,只换 Windows
+          // 安装包图标);卸载器与装好后的软件仍用 icon.ico。
+          installerIcon: 'resources/installer-icon.ico',
           uninstallerIcon: 'resources/icon.ico',
           createDesktopShortcut: 'always',
           createStartMenuShortcut: true,

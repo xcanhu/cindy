@@ -221,6 +221,15 @@ export function artifactBaseName({ version, versionless }) {
 }
 
 /**
+ * Windows 安装包文件名(owner 决定 2026-11-18:只换 Windows 安装包名为 heyme,
+ * 软件本身、热更 ZIP、mac/linux 产物仍用 cindy- 前缀)。热更与应用内更新按
+ * manifest 里写的文件名下载,与安装包名无关。
+ */
+export function windowsInstallerFileName({ version, versionless }) {
+  return `heyme-${versionless ? 'unversioned' : version}-Setup.exe`;
+}
+
+/**
  * 组装 build-info.json 内容(发布侧未来只读它决定上传什么)。
  * 所有字段由编排层收集后传入,本函数保持纯组装。
  * @param {{
