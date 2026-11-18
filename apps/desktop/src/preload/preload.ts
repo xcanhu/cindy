@@ -6778,6 +6778,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('maker:chat-server:reply', input),
       shareToMain: (input: Parameters<import('../shared/botGroupChat').ChatServerApi['shareToMain']>[0]): ReturnType<import('../shared/botGroupChat').ChatServerApi['shareToMain']> =>
         ipcRenderer.invoke('maker:chat-server:shareToMain', input),
+      borrowCompanion: (input: { groupId: string; actorId: string }): ReturnType<NonNullable<import('../shared/botGroupChat').ChatServerApi['borrowCompanion']>> =>
+        ipcRenderer.invoke('maker:chat-server:borrowCompanion', input),
       react: (input: Parameters<import('../shared/botGroupChat').ChatServerApi['react']>[0]): ReturnType<import('../shared/botGroupChat').ChatServerApi['react']> =>
         ipcRenderer.invoke('maker:chat-server:react', input),
       readers: (input: Parameters<import('../shared/botGroupChat').ChatServerApi['readers']>[0]): ReturnType<import('../shared/botGroupChat').ChatServerApi['readers']> =>

@@ -6089,6 +6089,91 @@ describe('Chat Server result delivery and refresh', () => {
     });
   });
 
+  // 测试价值 (bot-group-chat.md §14 借来单聊)
+  // - 生产入口与可观察结果：领取执行后发回群里的 `cindy.companion-borrow` 卡（有无链接、原因），以及成员调用
+  //   borrowCompanion 时发出的请求消息；群页投影只把链接给提问的人。
+  // - 规则依据：§14「只有获准使用工具的成员能拿到分享链接，伙伴本身不运行」。
+  // - 现有覆盖缺口：此前非主人请求一律进入只聊天的群专线，没有这条分支。
+  // - 最小失败输入：access_mode 'chat'，或授权在领取后被改成 chat，仍拿到链接；或伙伴被派发运行。
+  // - tier：unit（进程内 fake Chat Server）。
+  describe('borrowing someone else\'s companion (§14)', () => {
+    const peer = '30000000-0000-4000-8000-000000000002';
+    const sourceId = execution.source_message_id;
+    const request = { id: sourceId, seq: '1', authorId: peer, author: { kind: 'human', name: 'Peer' }, origin: 'user', deleted: false,
+      threadRootId: null, createdAt: '2026-10-03T00:00:00Z',
+      content: [{ type: 'card', namespace: 'cindy.companion-borrow', schemaRevision: 1, fallback: 'Bot, may I borrow you?', data: { type: 'request' } }] };
+    const link = 'https://link.example.com/api/device-link/provider-share/join#token';
+    function serve(mode: 'owner' | 'chat' | 'tools', guestAccess: 'chat' | 'tools' = 'tools') {
+      fixture.handle.mockImplementation((route, method) => {
+        if (route === '/executions/claim') {
+          const next = claimed ? null : { ...execution, access_mode: mode, requester_id: mode === 'owner' ? selfId : peer };
+          claimed = true; return { body: { execution: next } };
+        }
+        if (route.includes('/messages?')) return { body: [mode === 'owner' ? { ...request, authorId: selfId } : request] };
+        if (route === `/conversations/${roomId}/members` && method === 'GET') return { body: [
+          { id: botId, kind: 'bot', state: 'joined', ownerActorId: selfId, guestAccess, accessRevision: 1 },
+          { id: peer, kind: 'human', state: 'joined', ownerActorId: peer },
+          { id: selfId, kind: 'human', state: 'joined', ownerActorId: selfId },
+        ] };
+        return response(route);
+      });
+    }
+    async function claim() {
+      fixture.profiles = [{ id: 'local-bot', displayName: 'Bot', avatar: null, status: 'active' }];
+      await vi.advanceTimersByTimeAsync(2000);
+    }
+    const answer = () => deliveries()[0]?.[2]?.content?.[0];
+
+    it.each([
+      ['tools', 'tools', { ok: true, link, expiresAt: '2026-10-03T00:05:00Z' }, { type: 'offer', requesterId: peer, link }],
+      ['tools', 'tools', { ok: false, reason: 'not-shareable' }, { type: 'unavailable', requesterId: peer, reason: 'not-shareable' }],
+      // Revoked after the server queued the request: the live grant decides, no link is made.
+      ['tools', 'chat', null, { type: 'unavailable', requesterId: peer, reason: 'not-allowed' }],
+      ['chat', 'chat', null, { type: 'unavailable', requesterId: peer, reason: 'not-allowed' }],
+      ['owner', 'tools', null, { type: 'unavailable', requesterId: selfId, reason: 'own' }],
+    ] as const)('answers a %s request (live grant %s) with a card and never runs the companion', async (mode, guestAccess, created, expected) => {
+      deps.companionBorrowLink = vi.fn(async () => created as never);
+      serve(mode, guestAccess);
+      await claim();
+      expect(answer()).toMatchObject({ namespace: 'cindy.companion-borrow', schemaRevision: 1, data: expected });
+      expect(deliveries()[0][2]).toMatchObject({ continueDiscussion: false });
+      expect(deps.companionBorrowLink).toHaveBeenCalledTimes(created ? 1 : 0);
+      expect(deps.ensureLane).not.toHaveBeenCalled();
+      expect(deps.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('shows the link only to the member who asked', async () => {
+      const offer = (requesterId: string, id: string) => ({ id, seq: '2', authorId: botId, author: { kind: 'bot', name: 'Bot' }, origin: 'bot',
+        deleted: false, threadRootId: null, createdAt: '2026-10-03T00:00:01Z', content: [{ type: 'card', namespace: 'cindy.companion-borrow',
+          schemaRevision: 1, fallback: 'You can borrow it', data: { type: 'offer', requesterId, link, expiresAt: '2026-10-03T00:05:00Z' } }] });
+      const mine = '50000000-0000-4000-8000-000000000002', theirs = '50000000-0000-4000-8000-000000000003';
+      fixture.handle.mockImplementation(route => route.includes('/messages?') ? { body: [offer(selfId, mine), offer(peer, theirs)] } : response(route));
+      const result = await service.getGroup(roomId);
+      if (!result.ok) throw new Error(result.errorCode);
+      const byId = new Map(result.group.messages.map(message => [message.id, message]));
+      expect(byId.get(mine)).toMatchObject({ content: 'You can borrow it', companionBorrow: { forMe: true, link } });
+      expect(byId.get(theirs)).toMatchObject({ content: 'You can borrow it', companionBorrow: { forMe: false, link: null } });
+    });
+
+    it.each([
+      ['tools', peer, true],
+      ['chat', peer, false],
+      ['tools', selfId, false],
+    ] as const)('asks a companion with %s access owned by %s only when it may be borrowed', async (guestAccess, owner, posts) => {
+      fixture.handle.mockImplementation((route, method) => {
+        if (route === `/conversations/${roomId}/members`) return { body: [{ id: botId, kind: 'bot', name: 'Bot', state: 'joined', ownerActorId: owner, guestAccess, accessRevision: 1 }] };
+        if (route === `/conversations/${roomId}/messages` && method === 'POST') return { body: { id: '50000000-0000-4000-8000-000000000009' } };
+        return response(route);
+      });
+      const result = await service.chatServer!.borrowCompanion!({ groupId: roomId, actorId: botId });
+      const posted = fixture.handle.mock.calls.filter(([route, method]) => route === `/conversations/${roomId}/messages` && method === 'POST');
+      expect(result.ok).toBe(posts);
+      if (!posts) { expect(posted).toHaveLength(0); return; }
+      expect(posted[0][2]).toMatchObject({ mentions: [botId],
+        content: [{ type: 'card', namespace: 'cindy.companion-borrow', schemaRevision: 1, data: { type: 'request' } }] });
+    });
+  });
+
   describe('rooms that are not groups', () => {
     const directId = '70000000-0000-4000-8000-000000000001';
     const channelId = '70000000-0000-4000-8000-000000000002';

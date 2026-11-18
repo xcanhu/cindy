@@ -22,6 +22,8 @@ import { ProfileEditDialog } from '@/components/settings/ProfileEditDialog';
 import { getDataOwnerGeneration, isDataOwnerGenerationCurrent } from '@/contexts/dataOwnerGeneration';
 import { cn } from '@/lib/utils';
 import type { BotGroupMemberView, BotGroupSummary, ChatGroupAction } from '../../../shared/botGroupChat';
+import { toast } from '@/lib/toast';
+import { botGroupMemberDisplayName } from './BotGroupTimelineModel';
 import { groupRepositoryLabel, parseGroupRepository } from '../../../shared/botGroupChat';
 import { GroupMaskAvatar, useOpenGroupMask } from './GroupMaskControls';
 import { useGroupMask } from './groupMaskPresentation';
@@ -252,7 +254,22 @@ export function ChatGroupSettings({ group }: { group: BotGroupSummary }) {
       if (await mutate({ type: 'member', actorId: member.actorId!, action: 'remove' }) && mine) go(null);
     } finally { removing.current = false; }
   }
+  // 借来单聊 (bot-group-chat.md §14): the request is an ordinary group message to that companion; its
+  // owner's computer answers in the chat with the 申请使用 card, so we only post and report.
+  async function borrowCompanion(member: BotGroupMemberView) {
+    if (busyRef.current || !member.actorId) return;
+    busyRef.current = true; setBusy(true); setError('');
+    const owner = getDataOwnerGeneration();
+    try {
+      const result = await api().borrowCompanion({ groupId: group.id, actorId: member.actorId });
+      if (!mounted.current || !isDataOwnerGenerationCurrent(owner)) return;
+      if (!result.ok) { setError(t(chatErrorKey(result.errorCode))); return; }
+      toast.info(t('bots.groupChat.borrow.requested', { name: botGroupMemberDisplayName(member) }));
+    } catch { if (mounted.current && isDataOwnerGenerationCurrent(owner)) setError(t(chatErrorKey('REQUEST_FAILED'))); }
+    finally { busyRef.current = false; if (mounted.current) setBusy(false); }
+  }
   const memberActions: MemberActions = {
+    borrow: member => void borrowCompanion(member),
     access: member => go(`${COMPANION_PAGE}${member.actorId}`),
     role: member => void mutate({ type: 'member', actorId: member.actorId!, action: 'role', role: member.role === 'admin' ? 'member' : 'admin' }),
     transfer: member => void confirmed({ type: 'transfer', actorId: member.actorId! }, t(key('transferTitle'), { name: member.name }), t(key('transferHint'))),

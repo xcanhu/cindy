@@ -832,6 +832,7 @@ export const MAKER_INVOKE = {
   CHAT_SERVER_FOLLOWTHREAD: 'maker:chat-server:followThread',
   CHAT_SERVER_REPLY: 'maker:chat-server:reply',
   CHAT_SERVER_SHARETOMAIN: 'maker:chat-server:shareToMain',
+  CHAT_SERVER_BORROWCOMPANION: 'maker:chat-server:borrowCompanion',
   CHAT_SERVER_REACT: 'maker:chat-server:react',
   CHAT_SERVER_REACTORS: 'maker:chat-server:reactors',
   CHAT_SERVER_READERS: 'maker:chat-server:readers',

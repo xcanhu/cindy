@@ -11138,6 +11138,21 @@
       "threadClosed": "This buddy conversation has ended · view only"
     },
     "groupChat": {
+      "borrow": {
+        "menu": "Borrow this teammate",
+        "request": "{{name}}, may I borrow you? You'd work on my computer, on your owner's quota.",
+        "requested": "Asked to borrow {{name}}. The answer will appear in the group.",
+        "offer": "You can borrow it. Click Apply, and once {{name}}'s owner confirms the pairing code, the model it uses appears in your model list: pick it for a new task to work on your own computer, on the owner's quota.",
+        "apply": "Apply",
+        "expired": "This borrow link has expired. You can borrow again from the member list.",
+        "notAllowed": "This teammate's owner hasn't let you use its tools in this group, so it can't be borrowed yet.",
+        "unavailable": {
+          "own": "{{name}} is your own teammate. Just chat with it directly.",
+          "not-allowed": "{{name}}'s owner hasn't turned on “Tools and information” in this group, so it can't be borrowed yet.",
+          "not-shareable": "The model {{name}} uses can't be lent: its owner first needs to allow remote calls for this provider in Remote & Sharing.",
+          "unavailable": "{{name}}'s owner couldn't create a borrow link right now. Try again later."
+        }
+      },
       "mask": {
         "toolAccess": "Tool access",
         "catchup": {

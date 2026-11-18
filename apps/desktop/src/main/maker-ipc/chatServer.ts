@@ -58,6 +58,8 @@ import {
   readImportedBotGroupRuntimeFailureCode,
   readBotGroupExecutionFailure, type BotGroupExecutionFailureView,
   buildBotGroupThreadShareCard, botGroupThreadShareOperationId, readBotGroupThreadShareCard,
+  buildBotGroupCompanionBorrowRequest, buildBotGroupCompanionBorrowReply, isBotGroupCompanionBorrowRequest,
+  readBotGroupCompanionBorrowReply, type BotGroupCompanionBorrowReason,
   type BotGroupThreadShareView, type BotGroupThreadSummary, type BotGroupThreadUnread,
   type BotGroupDetail, type BotGroupMessageReaders, type BotGroupSpeaker, type BotGroupPlanView, type BotGroupFailure, type BotGroupMessageView, type BotGroupAttachment, type ChatServerApi,
   botGroupQuoteAttachmentName, botGroupQuoteExcerpt, botGroupQuoteFromMessage, buildBotGroupQuoteCard, readBotGroupQuote, readBotGroupQuoteCard, type BotGroupQuoteView,
@@ -1580,8 +1582,12 @@ function createChatServer(local: BotGroupChatService, deps: BotGroupChatServiceD
     const task = m.deleted || planCard ? null : taskCardOf(m);
     const liveTask = m.deleted || planCard ? null : liveTaskCardOf(m);
     const process = !m.deleted && m.author.kind === 'bot' ? m.content.map(readBotGroupProcessCard).find(Boolean) : null;
+    const borrow = readBotGroupCompanionBorrowReply(m);
+    // Only the member who asked gets the link; everyone else sees the card's text.
+    const companionBorrow = borrow ? { forMe: borrow.requesterId === selfId, link: borrow.requesterId === selfId ? borrow.link : null,
+      expiresAt: borrow.expiresAt, reason: borrow.reason } : null;
     return { id: m.id, maskAttribution: m.maskAttribution, sequence: Number(m.seq), serverSequence: m.seq, deleted: m.deleted, kind: capabilityNoticeCode ? 'notice' : planCard ? 'plan' : 'message', ...(capabilityNoticeCode ? { capabilityNoticeCode } : {}), authorKind: legacy?.authorKind === 'system' ? 'system' : m.author.kind === 'human' ? 'user' : 'bot',
-      isSelf: m.authorId === selfId, threadRootId: m.threadRootId, replyCount: m.replyCount ?? 0, reactions: m.reactions ?? [], ...(quote ? { quote } : {}), ...(task ? { task } : {}), ...(process ? { process } : {}),
+      isSelf: m.authorId === selfId, threadRootId: m.threadRootId, replyCount: m.replyCount ?? 0, reactions: m.reactions ?? [], ...(quote ? { quote } : {}), ...(task ? { task } : {}), ...(process ? { process } : {}), ...(companionBorrow ? { companionBorrow } : {}),
       // The teammate's owner opens the task itself; other members see the card as last posted.
       // actingFor identifies the requester for task access, not a personal-mask author.
       ...(liveTask ? { liveTask: { ...liveTask, ...(member?.ownerActorId === selfId || (member && isAssistant(member) && m.actingFor?.actorId === selfId) ? { openable: true } : {}),
@@ -3004,6 +3010,7 @@ function createChatServer(local: BotGroupChatService, deps: BotGroupChatServiceD
       if (!ownDirectRoom && !execution.mask_owner_id && execution.access_mode !== 'owner') toolsOff = true;
       if (!current() || running.get(execution.id) !== run) throw new Error('STALE_EXECUTOR');
       if (ownDirectRoom) { await runDirectExecution(run, bot.id, s.room.id); return; }
+      if (await isBorrowRequest(execution, sourceRead)) { await runBorrowExecution(run, bot, s.room.id); return; }
       if (await runInCardTask(run, s, sourceRead)) return;
       // Lane setup and context metadata reads run together; attachment bytes wait for setup
       // to succeed so a failed setup cannot leave downloads running after settlement.
@@ -3375,6 +3382,51 @@ function createChatServer(local: BotGroupChatService, deps: BotGroupChatServiceD
       await settleExecution(run, { sessionId: run.sessionId, activeInputClientId: run.clientId,
         outcome: 'error', resultText: '', failureCode: botGroupRuntimeFailureCode(error) }, true);
     }
+  }
+  /**
+   * 借来单聊 (bot-group-chat.md §14): a member's own request, addressed to this companion, asking to
+   * use it 1:1. Never a plan step, a personal-mask turn or a companion's message.
+   */
+  async function isBorrowRequest(execution: Execution, sourceRead: Promise<Message | undefined> | undefined): Promise<boolean> {
+    if (!sourceRead || execution.plan_id || execution.mask_owner_id || execution.mask_kind) return false;
+    const source = await sourceRead.catch(() => undefined);
+    return !!source && !!execution.requester_id && !source.threadRootId && source.authorId === execution.requester_id
+      && isBotGroupCompanionBorrowRequest(source);
+  }
+  /**
+   * Answer a borrow request without running the companion: only a member the owner already lets use
+   * this companion's tools (`guestAccess: 'tools'`, rechecked now) gets a provider-share link for the
+   * companion's provider. Joining still goes through the owner's own approval of that share, so
+   * nobody gets more than the owner confirms; the task then runs on the member's computer.
+   */
+  async function runBorrowExecution(run: Running, bot: { id: string; displayName: string }, roomId: string) {
+    const { execution } = run;
+    const live = () => { if (!current() || running.get(execution.id) !== run) throw new Error('STALE_EXECUTOR'); };
+    run.clientId = `companion-borrow:${execution.id}:${execution.epoch}`;
+    let reason: BotGroupCompanionBorrowReason | null = execution.access_mode === 'owner' ? 'own'
+      : execution.access_mode !== 'tools' ? 'not-allowed' : null;
+    if (!reason) {
+      try { await validateExecutionAuthority(run); }
+      catch (error) { if (error instanceof GroupToolAuthorizationError) reason = 'not-allowed'; else throw error; }
+    }
+    live();
+    let offer: { link: string; expiresAt: string } | null = null;
+    if (!reason) {
+      const created = deps.companionBorrowLink ? await deps.companionBorrowLink({ botId: bot.id, assertCurrent: live }) : { ok: false as const, reason: 'unavailable' as const };
+      live();
+      if (created.ok) offer = { link: created.link, expiresAt: created.expiresAt };
+      else reason = created.reason;
+    }
+    const name = bot.displayName;
+    const fallback = offer ? t('bots.groupChat.borrow.offer').replaceAll('{{name}}', () => name)
+      : t(`bots.groupChat.borrow.unavailable.${reason ?? 'unavailable'}`).replaceAll('{{name}}', () => name);
+    const card = offer ? buildBotGroupCompanionBorrowReply({ requesterId: execution.requester_id!, fallback, ...offer })
+      : buildBotGroupCompanionBorrowReply({ requesterId: execution.requester_id!, fallback, reason: reason ?? 'unavailable' });
+    run.accepted = true;
+    run.settlement = { terminal: { sessionId: '', activeInputClientId: run.clientId, outcome: 'done', resultText: '' },
+      payload: { content: [card], continueDiscussion: false }, retryAt: 0 };
+    await deliverSettlement(run);
+    changed(roomId);
   }
   /**
    * The owner wrote in the companion's room (e.g. from a phone while it was queued):
@@ -3981,6 +4033,24 @@ function createChatServer(local: BotGroupChatService, deps: BotGroupChatServiceD
         if (error instanceof ChatResponseError && error.message === 'OPERATION_CONFLICT') { changed(room); return { messageId: null, alreadyShared: true }; }
         throw error;
       }
+    }),
+    borrowCompanion: input => result(async () => {
+      const i = z.object({ groupId: id, actorId: id }).strict().parse(input);
+      const room = await groupRoom(i.groupId);
+      // Read fresh: the owner may have just changed what this companion lets others do.
+      const members = await api<Member[]>(`/conversations/${room}/members`);
+      const companion = members.find(m => m.id === i.actorId && m.kind === 'bot' && m.state === 'joined' && m.assistant !== true);
+      if (!companion || companion.ownerActorId === selfId) throw new Error('MEMBER_UNAVAILABLE');
+      if (companion.guestAccess !== 'tools') throw new Error('BORROW_NOT_ALLOWED');
+      const name = memberName(companion, members);
+      // Each click is a new request: the link it brings back is single-use and expires in minutes.
+      const posted = await api<{ id: string }>(`/conversations/${room}/messages`, 'POST', {
+        operationId: `companion-borrow:${randomUUID()}`,
+        content: [buildBotGroupCompanionBorrowRequest(t('bots.groupChat.borrow.request').replaceAll('{{name}}', () => name))],
+        mentions: [companion.id],
+      });
+      changed(room);
+      return { messageId: posted.id };
     }),
     reply: input => result(async () => {
       const i = z.object({ groupId: id, rootId: id, text: z.string().trim().max(8000), clientId: operationId,

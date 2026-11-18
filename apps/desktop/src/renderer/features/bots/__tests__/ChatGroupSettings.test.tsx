@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChatGroupSettings } from '../ChatGroupSettings';
 import { BotSettingsDrawer } from '../BotSettingsDrawer';
 import type { BotGroupSummary } from '../../../../shared/botGroupChat';
-const mocks = vi.hoisted(() => ({ manage: vi.fn(), updateBotGroup: vi.fn(async () => ({ ok: true })), ownedBots: vi.fn(), refresh: vi.fn(), confirm: vi.fn(), toastSuccess: vi.fn(), toastError: vi.fn() }));
+const mocks = vi.hoisted(() => ({ borrowCompanion: vi.fn(), toastInfo: vi.fn(), manage: vi.fn(), updateBotGroup: vi.fn(async () => ({ ok: true })), ownedBots: vi.fn(), refresh: vi.fn(), confirm: vi.fn(), toastSuccess: vi.fn(), toastError: vi.fn() }));
 const profiles = vi.hoisted(() => ({
   list: [{ id: 'bot', name: 'Partner', status: 'active', sessions: [] as Array<{ id: string }>, capabilities: {}, skills: [] as string[] }],
 }));
@@ -27,7 +27,7 @@ vi.mock('../BotsHomeView', () => ({
   ),
 }));
 vi.mock('../ChatInviteDialog', () => ({ ChatInviteDialog: ({ groupId }: { groupId: string }) => <div data-testid="invite-link-dialog" data-group={groupId} /> }));
-vi.mock('@/lib/toast', () => ({ toast: { success: mocks.toastSuccess, error: mocks.toastError } }));
+vi.mock('@/lib/toast', () => ({ toast: { success: mocks.toastSuccess, error: mocks.toastError, info: mocks.toastInfo } }));
 vi.mock('@/components/ui/confirm-dialog-provider', () => ({ useConfirmDialog: () => ({ confirm: mocks.confirm }) }));
 vi.mock('@/components/settings/ProfileEditDialog', () => ({ ProfileEditDialog: ({ open, avatarEditor }: {
   open: boolean; avatarEditor?: { hint: string; save(avatar: { type: 'reset' }): Promise<void> };
@@ -322,6 +322,23 @@ it('lets a companion owner manage a group owned by their companion', async () =>
 // Unit: the real settings UI previously offered every non-owner as a recipient.
 // Human-owner rule (2026-10-28): a bot member must have no transfer action;
 // a human member must still be transferable through the confirmation and IPC.
+// 测试价值 (bot-group-chat.md §14 借来单聊)
+// - 生产入口与可观察结果：成员页「⋯」菜单里出现「借用这位伙伴」并发出借用请求；没开工具授权的不出现。
+// - 现有覆盖缺口：成员菜单此前只覆盖自己的伙伴与管理操作，别人的伙伴没有菜单。
+// - 最小失败输入：guestAccess 'chat' 的别人伙伴也出现借用项，或点了不发请求。tier：unit（jsdom）。
+it.each(['tools', 'chat'] as const)('offers borrowing someone else\'s companion only with %s access when tools are allowed', async access => {
+  mocks.borrowCompanion.mockResolvedValue({ ok: true, messageId: 'm' });
+  const value = group();
+  value.members[1] = { ...value.members[1]!, role: 'member', guestAccess: access };
+  renderAt(value);
+  fireEvent.click(screen.getByRole('tab', { name: /bots\.groupChat\.settings\.members/ }));
+  if (access === 'chat') { expect(screen.queryByRole('button', { name: 'Partner' })).toBeNull(); return; }
+  openMenu(screen.getByRole('button', { name: 'Partner' }));
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'bots.groupChat.borrow.menu' }));
+  await waitFor(() => expect(mocks.borrowCompanion).toHaveBeenCalledWith({ groupId: 'room', actorId: 'bot' }));
+  await waitFor(() => expect(mocks.toastInfo).toHaveBeenCalledWith('bots.groupChat.borrow.requested:Partner'));
+});
+
 it('offers ownership transfer only to human members', async () => {
   const value = group(true);
   value.members[0]!.role = 'owner';

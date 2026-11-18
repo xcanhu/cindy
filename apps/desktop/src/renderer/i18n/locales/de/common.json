@@ -11138,6 +11138,21 @@
       "threadClosed": "Diese Unterhaltung zwischen Freunden ist beendet · nur ansehen"
     },
     "groupChat": {
+      "borrow": {
+        "menu": "Diesen Teamkollegen ausleihen",
+        "request": "{{name}}, darf ich dich ausleihen? Du arbeitest auf meinem Computer mit dem Kontingent deines Besitzers.",
+        "requested": "Ausleihe von {{name}} angefragt. Die Antwort erscheint in der Gruppe.",
+        "offer": "Du kannst ihn ausleihen. Klicke auf „Anfragen“; sobald der Besitzer von {{name}} den Kopplungscode bestätigt, erscheint das verwendete Modell in deiner Modellliste: Wähle es für eine neue Aufgabe, um auf deinem eigenen Computer mit dem Kontingent des Besitzers zu arbeiten.",
+        "apply": "Anfragen",
+        "expired": "Dieser Ausleih-Link ist abgelaufen. Du kannst über die Mitgliederliste erneut ausleihen.",
+        "notAllowed": "Der Besitzer dieses Teamkollegen hat dir in dieser Gruppe die Nutzung seiner Werkzeuge nicht erlaubt.",
+        "unavailable": {
+          "own": "{{name}} ist dein eigener Teamkollege. Chatte einfach direkt mit ihm.",
+          "not-allowed": "Der Besitzer von {{name}} hat „Tools und Informationen“ in dieser Gruppe nicht aktiviert, daher ist keine Ausleihe möglich.",
+          "not-shareable": "Das Modell von {{name}} kann nicht verliehen werden: Der Besitzer muss zuerst unter „Remote & Freigabe“ Fernaufrufe für diesen Anbieter erlauben.",
+          "unavailable": "Der Besitzer von {{name}} konnte gerade keinen Ausleih-Link erstellen. Bitte versuche es später erneut."
+        }
+      },
       "mask": {
         "toolAccess": "Tool-Zugriff",
         "catchup": {

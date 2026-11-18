@@ -11225,6 +11225,21 @@
       "exchangeCountShort_many": "{{count}} messages"
     },
     "groupChat": {
+      "borrow": {
+        "menu": "Emprunter ce coéquipier",
+        "request": "{{name}}, puis-je t'emprunter ? Tu travaillerais sur mon ordinateur, avec le quota de ton propriétaire.",
+        "requested": "Demande d'emprunt envoyée à {{name}}. La réponse apparaîtra dans le groupe.",
+        "offer": "Vous pouvez l'emprunter. Cliquez sur « Demander » ; une fois le code d'appairage confirmé par le propriétaire de {{name}}, le modèle qu'il utilise apparaît dans votre liste de modèles : choisissez-le pour une nouvelle tâche afin de travailler sur votre ordinateur, avec le quota du propriétaire.",
+        "apply": "Demander",
+        "expired": "Ce lien d'emprunt a expiré. Vous pouvez emprunter à nouveau depuis la liste des membres.",
+        "notAllowed": "Le propriétaire de ce coéquipier ne vous a pas autorisé à utiliser ses outils dans ce groupe.",
+        "unavailable": {
+          "own": "{{name}} est votre propre coéquipier. Discutez directement avec lui.",
+          "not-allowed": "Le propriétaire de {{name}} n'a pas activé « Outils et informations » dans ce groupe : emprunt impossible pour l'instant.",
+          "not-shareable": "Le modèle utilisé par {{name}} ne peut pas être prêté : son propriétaire doit d'abord autoriser les appels à distance pour ce fournisseur dans « Accès distant et partage ».",
+          "unavailable": "Le propriétaire de {{name}} n'a pas pu créer de lien d'emprunt pour le moment. Réessayez plus tard."
+        }
+      },
       "mask": {
         "toolAccess": "Accès aux outils",
         "catchup": {

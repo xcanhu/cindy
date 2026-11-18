@@ -61,7 +61,7 @@ import {
 import { BotGroupMessageAttachments } from './BotGroupMessageAttachments';
 import { BotGroupQuoteBlock } from './BotGroupQuote';
 import { BotGroupRuntimeFailureNotice } from './BotGroupRuntimeFailureNotice';
-import { BotGroupLiveTaskCard, BotGroupTaskCard } from './BotGroupTaskCard';
+import { BotGroupCompanionBorrowAction, BotGroupLiveTaskCard, BotGroupTaskCard } from './BotGroupTaskCard';
 import type { BotGroupTimelineMessage } from './BotGroupTimelineModel';
 import { ChatMessageHoverActions, ChatMessageReactions } from './ChatServerControls';
 
@@ -661,6 +661,7 @@ function BotGroupTimelineItemImpl(props: BotGroupTimelineItemProps) {
                       botId={message.authorBotId} />
                   ) : null}
                   {!share && message.liveTask ? <BotGroupLiveTaskCard task={message.liveTask} /> : null}
+                  {!share && message.companionBorrow ? <BotGroupCompanionBorrowAction borrow={message.companionBorrow} /> : null}
                   {!share && <BotGroupMessageAttachments attachments={message.attachments ?? []} align="start" />}
                   <BotGroupHandoffFiles files={message.files ?? []} workDir={props.plan?.workDir ?? null} />
                 </>
